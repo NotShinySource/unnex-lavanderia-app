@@ -44,10 +44,10 @@ export const Login = () => {
             <span className="text-4xl">🧺</span>
           </div>
           <h1 className="text-3xl font-bold text-spac-dark mb-2">
-            Lavandería SPAC
+            Lavandería El Cobre SPA
           </h1>
           <p className="text-spac-gray">
-            Sistema de Gestión y Seguimiento
+            Inicio de Sesión
           </p>
         </div>
 
