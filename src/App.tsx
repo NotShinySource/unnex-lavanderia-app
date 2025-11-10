@@ -5,7 +5,7 @@ import { PrivateRoute } from './components/PrivateRoute';
 import { FirebaseTest } from './pages/FirebaseTest';
 import { LogoutButton } from './components/LogoutButton';
 // import { ClientTracking } from './pages/ClientTracking';
-// import { EmployeePanel } from './pages/EmployeePanel';
+import { EmployeePanel } from './pages/EmployeePanel';
 // import { AdminPanel } from './pages/AdminPanel';
 
 // Componente temporal para las páginas que aún no creamos
@@ -96,7 +96,7 @@ function App() {
           path="/empleado" 
           element={
             <PrivateRoute allowedRoles={['empleado']}>
-              <ComingSoon title="Panel de Empleado" />
+              <EmployeePanel />
             </PrivateRoute>
           } 
         />
@@ -106,7 +106,18 @@ function App() {
           path="/repartidor" 
           element={
             <PrivateRoute allowedRoles={['repartidor']}>
-              <ComingSoon title="Panel de Repartidor" />
+              <div className="min-h-screen bg-gray-100">
+                <nav className="bg-white shadow-md p-4 flex justify-between items-center">
+                  <h1 className="text-2xl font-bold text-spac-dark">Panel de Repartidor</h1>
+                  <LogoutButton />
+                </nav>
+                <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+                  <div className="bg-white p-8 rounded-lg shadow-md text-center">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-4">Bienvenido, Repartidor</h2>
+                    <p className="text-gray-600">Esta página estará disponible pronto</p>
+                  </div>
+                </div>
+              </div>
             </PrivateRoute>
           } 
         />

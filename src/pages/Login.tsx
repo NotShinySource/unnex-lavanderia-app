@@ -2,11 +2,12 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import logoLavanderia from '../assets/logo.png';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  //const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -24,7 +25,7 @@ export const Login = () => {
     try {
       setError('');
       setLoading(true);
-      await login(email, password);
+      await login(email, password, /*rememberMe*/);
       window.location.href = '/';
       
     } catch (err: any) {
@@ -40,8 +41,12 @@ export const Login = () => {
         
         {/* Logo y título */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-spac-light rounded-full mb-4">
-            <span className="text-4xl">🧺</span>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-spac-light rounded-full mb-4 overflow-hidden">
+            <img 
+              src={logoLavanderia} 
+              alt="Logo Lavandería El Cobre" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <h1 className="text-3xl font-bold text-spac-dark mb-2">
             Lavandería El Cobre SPA
@@ -100,6 +105,7 @@ export const Login = () => {
           </div>
 
           {/* Recordar sesión */}
+          {/*
           <div className="flex items-center">
             <input
               id="remember"
@@ -116,6 +122,7 @@ export const Login = () => {
               Recordar mi sesión
             </label>
           </div>
+          */}
 
           {/* Botón de login */}
           <button

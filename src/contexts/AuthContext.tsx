@@ -14,6 +14,7 @@ import { auth, db } from '../config/firebase';
 
 // Tipos
 interface UserData {
+  id?: string;
   email: string;
   rol: 'administrador' | 'empleado' | 'repartidor';
   nombre: string;
@@ -55,7 +56,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Usuario no encontrado en la base de datos');
       }
       
-      const data = userDoc.data() as UserData;
+      const data = {
+        ...(userDoc.data() as UserData),
+        id: userCredential.user.uid  // 👈 Agregar el ID
+      };
       setUserData(data);
       
     } catch (error: any) {
@@ -97,7 +101,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (user) {
           const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
           if (userDoc.exists()) {
-            setUserData(userDoc.data() as UserData);
+            setUserData({
+              ...(userDoc.data() as UserData),
+              id: user.uid
+            });
           } else {
             setUserData(null);
           }
@@ -106,6 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         console.error('Error al obtener datos del usuario:', error);
+        console.log('Error');
         setUserData(null);
       } finally {
         setLoading(false);

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { getAuth, /*setPersistence, browserSessionPersistence */} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // Configuración usando variables de entorno
@@ -39,8 +39,8 @@ export const db = getFirestore(app);
 
 // Configurar persistencia por sesión por defecto (se cierra al cerrar navegador)
 // Esto se puede cambiar desde el login con la opción "Recordar sesión"
-setPersistence(auth, browserSessionPersistence).catch((error) => {
-  console.error('Error al configurar persistencia:', error);
-});
+//setPersistence(auth, browserSessionPersistence).catch((error) => {
+  //console.error('Error al configurar persistencia:', error);
+//});
 
 export default app;
