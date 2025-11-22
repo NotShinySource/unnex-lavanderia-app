@@ -235,7 +235,7 @@ export const ESTADOS_CONFIG: Record<EstadoComanda, {
     icon: BsCheckCircle
   },
   listo_despacho: {
-    label: 'Listo para Despacho',
+    label: 'Preparando Despacho',
     color: 'text-teal-700',
     bgColor: 'bg-teal-100',
     icon: BsBoxSeam
