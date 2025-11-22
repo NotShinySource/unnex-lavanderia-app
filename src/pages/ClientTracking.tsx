@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../config/firebase.ts";
-import logo from "../assets/Logo_Spa.png";
+import logo from "../assets/logo.png";
 
 export const ClientTracking = () => {
   const { codigo } = useParams<{ codigo: string }>(); // Extrae código de la URL

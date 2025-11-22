@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { Comanda, Turno, EmpleadoAsignado } from '../types';
-import { avanzarEstado } from '../services/comandaService';
+import type { ComandaCompleta, Turno, OperarioAsignado } from '../types';
+import { avanzarEstado } from '../services/seguimientoService';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ModalAvanzarEstadoProps {
-  comanda: Comanda;
+  comandaCompleta: ComandaCompleta;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -17,63 +17,63 @@ interface Usuario {
   rol: string;
 }
 
-export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzarEstadoProps) => {
+export const ModalAvanzarEstado = ({ comandaCompleta, onClose, onSuccess }: ModalAvanzarEstadoProps) => {
   const { userData } = useAuth();
+  const { comanda, seguimiento } = comandaCompleta;
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<Turno>('A');
-  const [empleados, setEmpleados] = useState<Usuario[]>([]);
-  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<Set<string>>(new Set());
+  const [operarios, setOperarios] = useState<Usuario[]>([]);
+  const [operariosSeleccionados, setOperariosSeleccionados] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [loadingEmpleados, setLoadingEmpleados] = useState(true);
+  const [loadingOperarios, setLoadingOperarios] = useState(true);
 
-  // Determinar si necesitamos asignar empleados
-  // Ahora se asignan cuando avanzas DE pendiente (para el próximo estado: lavando)
-  const necesitaAsignacion = comanda.estadoActual === 'pendiente' || 
-    ['lavando', 'secando', 'planchando', 'desmanche'].includes(comanda.estadoActual);
+  // Determinar si necesitamos asignar operarios
+  const necesitaAsignacion = seguimiento.estadoActual === 'pendiente' || 
+    ['lavando', 'secando', 'planchando', 'desmanche'].includes(seguimiento.estadoActual);
 
-  // Cargar empleados disponibles
+  // Cargar operarios disponibles
   useEffect(() => {
-    const cargarEmpleados = async () => {
+    const cargarOperarios = async () => {
       try {
         const q = query(
           collection(db, 'usuarios'),
-          where('rol', '==', 'empleado'),
+          where('rol', '==', 'operario'),
           where('activo', '==', true)
         );
         
         const snapshot = await getDocs(q);
-        const empleadosData: Usuario[] = [];
+        const operariosData: Usuario[] = [];
         
         snapshot.forEach(doc => {
-          empleadosData.push({
+          operariosData.push({
             id: doc.id,
             nombre: doc.data().nombre,
             rol: doc.data().rol
           });
         });
         
-        setEmpleados(empleadosData);
+        setOperarios(operariosData);
       } catch (error) {
-        console.error('Error al cargar empleados:', error);
+        console.error('Error al cargar operarios:', error);
       } finally {
-        setLoadingEmpleados(false);
+        setLoadingOperarios(false);
       }
     };
 
     if (necesitaAsignacion) {
-      cargarEmpleados();
+      cargarOperarios();
     } else {
-      setLoadingEmpleados(false);
+      setLoadingOperarios(false);
     }
   }, [necesitaAsignacion]);
 
-  // Toggle selección de empleado
-  const toggleEmpleado = (empleadoId: string) => {
-    setEmpleadosSeleccionados(prev => {
+  // Toggle selección de operario
+  const toggleOperario = (operarioId: string) => {
+    setOperariosSeleccionados(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(empleadoId)) {
-        newSet.delete(empleadoId);
+      if (newSet.has(operarioId)) {
+        newSet.delete(operarioId);
       } else {
-        newSet.add(empleadoId);
+        newSet.add(operarioId);
       }
       return newSet;
     });
@@ -83,35 +83,35 @@ export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzar
   const handleAvanzar = async () => {
     if (!userData) return;
 
-    // Validar que se hayan seleccionado empleados si es necesario
-    if (necesitaAsignacion && empleadosSeleccionados.size === 0) {
-      alert('Debes seleccionar al menos un empleado');
+    // Validar que se hayan seleccionado operarios si es necesario
+    if (necesitaAsignacion && operariosSeleccionados.size === 0) {
+      alert('Debes seleccionar al menos un operario');
       return;
     }
 
     try {
       setLoading(true);
 
-      const empleadosAsignadosArray: EmpleadoAsignado[] = [];
+      const operariosAsignadosArray: OperarioAsignado[] = [];
       
       if (necesitaAsignacion) {
-        empleadosSeleccionados.forEach(id => {
-          const empleado = empleados.find(e => e.id === id);
-          if (empleado) {
-            empleadosAsignadosArray.push({
-              id: empleado.id,
-              nombre: empleado.nombre
+        operariosSeleccionados.forEach(id => {
+          const operario = operarios.find(e => e.id === id);
+          if (operario) {
+            operariosAsignadosArray.push({
+              id: operario.id,
+              nombre: operario.nombre
             });
           }
         });
       }
 
       await avanzarEstado({
-        comanda,
-        empleado_id: userData.id || '',
-        empleadoNombre: userData.nombre,
+        seguimiento,
+        operario_id: userData.id || '',
+        operarioNombre: userData.nombre,
         turno: necesitaAsignacion ? turnoSeleccionado : undefined,
-        empleadosAsignados: empleadosAsignadosArray
+        operariosAsignados: operariosAsignadosArray
       });
 
       onSuccess();
@@ -124,6 +124,26 @@ export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzar
     }
   };
 
+  // Obtener texto descriptivo del siguiente estado
+  const getTextoSiguienteEstado = (): string => {
+    const estado = seguimiento.estadoActual;
+    
+    if (estado === 'pendiente') return 'Pasará a Lavado';
+    if (estado === 'lavando') return 'Pasará a Secado';
+    if (estado === 'secando') return 'Pasará a Planchado';
+    if (estado === 'planchando') return 'Pasará a Empaquetado';
+    if (estado === 'desmanche') return 'Volverá a Lavado';
+    if (estado === 'empaquetado') {
+      return comanda.tipoEntrega === 'retiro' 
+        ? 'Pasará a Listo para Retiro' 
+        : 'Pasará a Listo para Despacho';
+    }
+    if (estado === 'listo_retiro') return 'Marcará como Entregado';
+    if (estado === 'listo_despacho') return 'Esperando asignación de repartidor';
+    
+    return 'Avanzar al siguiente estado';
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -132,7 +152,7 @@ export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzar
         <div className="bg-spac-orange text-white p-6 rounded-t-xl">
           <h2 className="text-xl font-bold">Avanzar Estado</h2>
           <p className="text-sm opacity-90 mt-1">
-            {comanda.codigoSeguimiento} - {comanda.cliente.nombre}
+            {comanda.numeroOrden} - {comanda.nombreCliente}
           </p>
         </div>
 
@@ -170,40 +190,40 @@ export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzar
                 </div>
               </div>
 
-              {/* Selector de Empleados */}
+              {/* Selector de Operarios */}
               <div>
                 <label className="block text-sm font-semibold text-spac-dark mb-3">
-                  Selecciona Empleado(s)
+                  Selecciona Operario(s)
                 </label>
                 
-                {loadingEmpleados ? (
+                {loadingOperarios ? (
                   <div className="text-center py-8 text-spac-gray">
-                    Cargando empleados...
+                    Cargando operarios...
                   </div>
-                ) : empleados.length === 0 ? (
+                ) : operarios.length === 0 ? (
                   <div className="text-center py-8 text-red-600">
-                    No hay empleados disponibles
+                    No hay operarios disponibles
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {empleados.map(empleado => (
+                    {operarios.map(operario => (
                       <label
-                        key={empleado.id}
+                        key={operario.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
-                          empleadosSeleccionados.has(empleado.id)
+                          operariosSeleccionados.has(operario.id)
                             ? 'border-spac-orange bg-spac-light'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
                         <input
                           type="checkbox"
-                          checked={empleadosSeleccionados.has(empleado.id)}
-                          onChange={() => toggleEmpleado(empleado.id)}
+                          checked={operariosSeleccionados.has(operario.id)}
+                          onChange={() => toggleOperario(operario.id)}
                           className="w-5 h-5 text-spac-orange rounded focus:ring-spac-orange"
                         />
                         <div className="flex-1">
-                          <p className="font-medium text-spac-dark">{empleado.nombre}</p>
-                          <p className="text-xs text-spac-gray">ID: {empleado.id.substring(0, 8)}...</p>
+                          <p className="font-medium text-spac-dark">{operario.nombre}</p>
+                          <p className="text-xs text-spac-gray">ID: {operario.id.substring(0, 8)}...</p>
                         </div>
                       </label>
                     ))}
@@ -212,13 +232,13 @@ export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzar
               </div>
 
               {/* Resumen de selección */}
-              {empleadosSeleccionados.size > 0 && (
+              {operariosSeleccionados.size > 0 && (
                 <div className="bg-spac-light p-4 rounded-lg">
                   <p className="text-sm font-semibold text-spac-dark mb-2">
                     📋 Resumen:
                   </p>
                   <p className="text-sm text-spac-dark-secondary">
-                    Turno {turnoSeleccionado} • {empleadosSeleccionados.size} empleado(s) seleccionado(s)
+                    Turno {turnoSeleccionado} • {operariosSeleccionados.size} operario(s) seleccionado(s)
                   </p>
                 </div>
               )}
@@ -226,12 +246,11 @@ export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzar
           ) : (
             <div className="text-center py-6">
               <div className="text-5xl mb-4">✅</div>
-              <p className="text-spac-dark font-medium">
+              <p className="text-spac-dark font-medium mb-2">
                 ¿Confirmas avanzar al siguiente estado?
               </p>
-              <p className="text-sm text-spac-gray mt-2">
-                {comanda.estadoActual === 'pendiente' && 'Se notificará al cliente por WhatsApp'}
-                {comanda.estadoActual === 'empaquetado' && `Pasará a ${comanda.tipoEntrega === 'retiro' ? 'Listo para Retiro' : 'Listo para Despacho'}`}
+              <p className="text-sm text-spac-gray">
+                {getTextoSiguienteEstado()}
               </p>
             </div>
           )}
@@ -248,7 +267,7 @@ export const ModalAvanzarEstado = ({ comanda, onClose, onSuccess }: ModalAvanzar
           </button>
           <button
             onClick={handleAvanzar}
-            disabled={loading || loadingEmpleados || (necesitaAsignacion && empleadosSeleccionados.size === 0)}
+            disabled={loading || loadingOperarios || (necesitaAsignacion && operariosSeleccionados.size === 0)}
             className="flex-1 px-4 py-3 bg-spac-orange hover:bg-spac-orange-dark text-white font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Avanzando...' : 'Confirmar'}
