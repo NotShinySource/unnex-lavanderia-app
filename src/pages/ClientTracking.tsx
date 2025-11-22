@@ -310,18 +310,24 @@ export const ClientTracking = () => {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-spac-gray">Última actualización</p>
                   {(() => {
-                    const ultimoEstado = comandaCompleta.seguimiento.historialEstados[
-                      comandaCompleta.seguimiento.historialEstados.length - 1
-                    ];
+                    const esPendiente = comandaCompleta.seguimiento.estadoActual === 'pendiente';
+                    const fecha = esPendiente 
+                      ? comandaCompleta.comanda.fechaIngreso
+                      : comandaCompleta.seguimiento.historialEstados[
+                          comandaCompleta.seguimiento.historialEstados.length - 1
+                        ].fechaCambio;
+                    
                     return (
                       <>
+                        <p className="text-sm text-spac-gray">
+                          {esPendiente ? 'Ingreso' : 'Última actualización'}
+                        </p>
                         <p className="font-semibold text-spac-dark">
-                          {formatearFecha(ultimoEstado.fechaCambio)}
+                          {formatearFecha(fecha)}
                         </p>
                         <p className="text-sm text-spac-gray">
-                          {formatearHora(ultimoEstado.fechaCambio)}
+                          {formatearHora(fecha)}
                         </p>
                       </>
                     );
