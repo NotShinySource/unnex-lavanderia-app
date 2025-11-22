@@ -215,6 +215,14 @@ export const ClientTracking = () => {
     });
   };
 
+  const getLineaWidth = (): string => {
+  if (!comandaCompleta) return 'w-16';
+
+    const esDespacho = comandaCompleta.comanda.tipoEntrega === 'despacho';
+    return esDespacho ? 'w-8' : 'w-14';
+  };
+
+
   return (
     <div className="min-h-screen bg-spac-light">
       {/* Header/Navbar */}
@@ -383,12 +391,14 @@ export const ClientTracking = () => {
                       {/* Línea conectora */}
                       {index < estadosProceso.length - 1 && (
                         <div
-                          className={`w-16 md:w-13 h-1 mx-3 transition-all ${
-                            estadoVisual === 'completado'
-                              ? 'bg-green-500'
-                              : 'bg-gray-200'
-                          }`}
+                          className={`
+                            h-1 mx-3 transition-all
+                            ${estadoVisual === 'completado' ? 'bg-green-500' : 'bg-gray-200'}
+                            ${getLineaWidth()}
+                            md:${getLineaWidth()}
+                          `}
                         />
+
                       )}
                     </div>
                   );
