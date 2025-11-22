@@ -4,8 +4,6 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  //setPersistence,
-  //browserSessionPersistence,
   type User 
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -28,13 +26,15 @@ interface AuthContextType {
   userData: UserData | null;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  loginWithToken: (uid: string) => Promise<boolean>;
   loading: boolean;
 }
 
-// Crear contexto
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Hook personalizado
+// Clave para sessionStorage (se borra al cerrar navegador)
+const SESSION_KEY = 'lavanderia_session_temp';
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -43,148 +43,140 @@ export const useAuth = () => {
   return context;
 };
 
-// Provider
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Función de login mejorada con manejo de errores
-  const login = async (email: string, password: string) => {
+  // 1. CAMBIO: Usamos sessionStorage en lugar de localStorage
+  // Esto evita que el usuario se quede guardado "para siempre" si no hay "Remember me"
+  const [userData, setUserData] = useState<UserData | null>(() => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const stored = sessionStorage.getItem(SESSION_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(!userData);
+
+  // Función auxiliar para guardar sesión temporal
+  const saveSession = (data: UserData) => {
+    setUserData(data);
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  };
+
+  const clearSession = () => {
+    setUserData(null);
+    setCurrentUser(null);
+    sessionStorage.removeItem(SESSION_KEY);
+  };
+
+  // LOGIN CON TOKEN (INTRA)
+  const loginWithToken = async (uid: string): Promise<boolean> => {
+    try {
+      setLoading(true);
       
-      try {
-        const userDoc = await getDoc(doc(db, 'usuarios', userCredential.user.uid));
+      // 2. IMPORTANTE: Forzar logout de Firebase para evitar conflictos de permisos
+      // si veníamos de otra sesión.
+      await signOut(auth); 
+      
+      const userDoc = await getDoc(doc(db, 'usuarios', uid));
+      
+      if (userDoc.exists()) {
+        const docData = userDoc.data();
         
-        if (userDoc.exists()) {
-          const docData = userDoc.data();
-          const data: UserData = {
-            id: userCredential.user.uid,
-            uid: docData.uid || userCredential.user.uid,
-            correo: docData.correo || userCredential.user.email || '',
-            nombre: docData.nombre || userCredential.user.displayName || 'Usuario',
-            rol: docData.rol || 'operario',
-            fecha_creacion: docData.fecha_creacion?.toDate?.(),
-            ultimo_acceso: docData.ultimo_acceso?.toDate?.(),
-            activo: docData.activo !== undefined ? docData.activo : true
-          };
-          setUserData(data);
-        } else {
-          // Usuario autenticado pero sin documento en Firestore
-          // Usar datos de Firebase Auth
-          const data: UserData = {
-            id: userCredential.user.uid,
-            uid: userCredential.user.uid,
-            correo: userCredential.user.email || '',
-            nombre: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || 'Usuario',
-            rol: 'operario', // Rol por defecto
-            activo: true
-          };
-          setUserData(data);
-          console.warn('⚠️ Usuario sin documento en Firestore. Usando datos de Firebase Auth.');
-        }
-      } catch (firestoreError) {
-        // Error al acceder a Firestore (permisos, red, etc.)
-        // No fallar el login, usar datos de Firebase Auth
-        console.warn('⚠️ Error al acceder a Firestore:', firestoreError);
         const data: UserData = {
-          id: userCredential.user.uid,
-          uid: userCredential.user.uid,
-          correo: userCredential.user.email || '',
-          nombre: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || 'Usuario',
-          rol: 'operario', // Rol por defecto
-          activo: true
+          id: uid,
+          uid: uid,
+          correo: docData.correo || 'usuario@intranet.cl',
+          nombre: docData.nombre || 'Usuario Intranet',
+          rol: docData.rol || 'operario',
+          fecha_creacion: docData.fecha_creacion?.toDate?.(),
+          ultimo_acceso: docData.ultimo_acceso?.toDate?.(),
+          activo: docData.activo !== undefined ? docData.activo : true
         };
-        setUserData(data);
+
+        // Simulamos el usuario de Auth para que el resto de la app no falle
+        const fakeUser = {
+          uid: uid,
+          email: data.correo,
+          displayName: data.nombre,
+          emailVerified: true,
+        } as unknown as User;
+
+        setCurrentUser(fakeUser);
+        saveSession(data); // Guardamos en session
+        return true;
+      } else {
+        console.error('Usuario no encontrado en Firestore');
+        return false;
       }
-      
-    } catch (error: any) {
-      // Mensajes de error en español
-      const errorMessages: Record<string, string> = {
-        'auth/user-not-found': 'Usuario no encontrado',
-        'auth/wrong-password': 'Contraseña incorrecta',
-        'auth/invalid-email': 'Email inválido',
-        'auth/user-disabled': 'Usuario deshabilitado',
-        'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde',
-        'auth/invalid-credential': 'Credenciales inválidas',
-      };
-      
-      throw new Error(errorMessages[error.code] || 'Error al iniciar sesión');
+    } catch (error) {
+      console.error('Error en loginWithToken:', error);
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Función de logout
-  const logout = async () => {
+  const login = async (email: string, password: string) => {
     try {
-      await signOut(auth);
-      setUserData(null);
-      
-      // Resetear persistencia a sessionPersistence por defecto
-      //await setPersistence(auth, browserSessionPersistence);
-      
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
+      await signInWithEmailAndPassword(auth, email, password);
+      // El onAuthStateChanged se encargará de cargar los datos
+    } catch (error: any) {
+      console.error(error);
       throw error;
     }
   };
 
-  // Efecto para escuchar cambios de autenticación
-  // En el useEffect, reemplazar TODO el código por esto:
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      clearSession();
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    
-      setCurrentUser(user);
-      
       if (user) {
-        
+        setCurrentUser(user);
+        // Si ya tenemos datos cargados por token (y coinciden), no recargamos
+        if (userData && userData.uid === user.uid) {
+          setLoading(false);
+          return;
+        }
+
         try {
           const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-          
           if (userDoc.exists()) {
             const docData = userDoc.data();
-            const finalUserData = {
+            const newData: UserData = {
               id: user.uid,
-              uid: docData.uid || user.uid,
+              uid: user.uid,
               correo: docData.correo || user.email || '',
               nombre: docData.nombre || user.displayName || 'Usuario',
               rol: docData.rol || 'operario',
-              fecha_creacion: docData.fecha_creacion?.toDate?.(),
-              ultimo_acceso: docData.ultimo_acceso?.toDate?.(),
-              activo: docData.activo !== undefined ? docData.activo : true
+              activo: docData.activo ?? true
             };
-            setUserData(finalUserData);
-          } else {
-            const fallbackUserData = {
-              id: user.uid,
-              uid: user.uid,
-              correo: user.email || '',
-              nombre: user.displayName || user.email?.split('@')[0] || 'Usuario',
-              rol: 'operario' as const,
-              activo: true
-            };
-            setUserData(fallbackUserData);
+            saveSession(newData);
           }
         } catch (error) {
-          const fallbackUserData = {
-            id: user.uid,
-            uid: user.uid,
-            correo: user.email || '',
-            nombre: user.displayName || user.email?.split('@')[0] || 'Usuario',
-            rol: 'operario' as const,
-            activo: true
-          };
-          setUserData(fallbackUserData);
+          console.error("Error cargando datos de usuario", error);
         }
       } else {
-        setUserData(null);
+        // Si no hay usuario de Firebase Y no estamos en medio de un proceso manual
+        if (!loading) {
+          // No borramos inmediatamente si userData existe para evitar parpadeos 
+          // en recargas manuales, pero si auth es null real, limpiamos.
+          // Para este caso simple, sincronizamos:
+          // setCurrentUser(null);
+        }
       }
       setLoading(false);
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   const value: AuthContextType = {
@@ -192,12 +184,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     userData,
     login,
     logout,
+    loginWithToken,
     loading
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
