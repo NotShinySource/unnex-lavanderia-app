@@ -357,6 +357,22 @@ export const avanzarEstado = async ({
     throw new Error('No hay siguiente estado disponible');
   }
 
+  const formatearEstado = (estado: EstadoComanda): string => {
+    const mapeo: Record<EstadoComanda, string> = {
+      'pendiente': 'Pendiente',
+      'lavando': 'Lavado',
+      'secando': 'Secado',
+      'planchando': 'Planchado',
+      'desmanche': 'Desmanche',
+      'empaquetado': 'Empaquetado',
+      'listo_retiro': 'Listo para Retiro',
+      'listo_despacho': 'Preparando Despacho',
+      'en_despacho': 'En Despacho',
+      'entregado': 'Entregado'
+    };
+    return mapeo[estado] || estado;
+  };
+
   // Preparar actualización del historial
   const nuevoHistorial = {
     estado: siguienteEstado,
@@ -364,7 +380,7 @@ export const avanzarEstado = async ({
     operario_id,
     operarioNombre,
     turno: turno || null,
-    comentario: `Avanzó de ${estadoActual} a ${siguienteEstado}`
+    comentario: `Avanzó de ${formatearEstado(estadoActual)} a ${formatearEstado(siguienteEstado)}`
   };
 
   // Preparar datos de actualización

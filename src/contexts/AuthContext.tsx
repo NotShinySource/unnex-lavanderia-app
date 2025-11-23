@@ -13,8 +13,9 @@ import { auth, db } from '../config/firebase';
 interface UserData {
   id?: string;
   correo: string;
-  rol: 'administrador' | 'operario' | 'repartidor';
+  rol: 'administrador' | 'operario' | 'repartidor' | 'cliente';
   uid: string;
+  telefono?: string;
   nombre: string;
   fecha_creacion?: Date;
   ultimo_acceso?: Date;
@@ -90,6 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           correo: docData.correo || 'usuario@intranet.cl',
           nombre: docData.nombre || 'Usuario Intranet',
           rol: docData.rol || 'operario',
+          telefono: docData.telefono || undefined,
           fecha_creacion: docData.fecha_creacion?.toDate?.(),
           ultimo_acceso: docData.ultimo_acceso?.toDate?.(),
           activo: docData.activo !== undefined ? docData.activo : true
@@ -157,6 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               correo: docData.correo || user.email || '',
               nombre: docData.nombre || user.displayName || 'Usuario',
               rol: docData.rol || 'operario',
+              telefono: docData.telefono || undefined,
               activo: docData.activo ?? true
             };
             saveSession(newData);

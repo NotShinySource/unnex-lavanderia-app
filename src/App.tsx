@@ -5,8 +5,10 @@ import { PrivateRoute } from './components/PrivateRoute';
 import { EmployeePanel } from './pages/EmployeePanel';
 import { DealerPanel } from './pages/DealerPanel';
 import { ClientTracking } from './pages/ClientTracking';
+import { ClientPanel } from './pages/ClientPanel';
 import { FirebaseTest } from './pages/FirebaseTest';
 import { useEffect, useState } from 'react';
+import { inicializarListenerComandas } from './services/seguimientoService';
 
 // URL de tu Intranet
 const MAIN_INTRANET_URL = "https://lavanderia-cobre-landingpage.vercel.app/intranet/dashboard";
@@ -151,6 +153,8 @@ const DashboardRedirect = () => {
       return <Navigate to="/operario" replace />;
     case 'repartidor':
       return <Navigate to="/repartidor" replace />;
+    case 'cliente':
+      return <Navigate to="/cliente" replace />;
     default:
       return <Navigate to="/login" replace />;
   }
@@ -166,6 +170,19 @@ const ComingSoon = ({ title }: { title: string }) => (
 );
 
 function App() {
+
+  useEffect(() => {
+    console.log('🎧 Iniciando listener de comandas...');
+    const unsubscribe = inicializarListenerComandas((comanda) => {
+      console.log('✅ Nueva comanda detectada:', comanda.numeroOrden);
+    });
+
+    return () => {
+      console.log('🔴 Deteniendo listener de comandas');
+      unsubscribe();
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -188,6 +205,12 @@ function App() {
         <Route path="/repartidor" element={
             <PrivateRoute allowedRoles={['repartidor']}>
               <DealerPanel />
+            </PrivateRoute>
+          } 
+        />
+        <Route path="/cliente" element={
+            <PrivateRoute allowedRoles={['cliente']}>
+              <ClientPanel />
             </PrivateRoute>
           } 
         />

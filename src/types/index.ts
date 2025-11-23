@@ -25,6 +25,7 @@ export interface Usuario {
   correo: string;
   rol: RolUsuario;
   uid: string;
+  telefono?: string;
   fecha_creacion: Date;
   ultimo_acceso: Date;
   activo: boolean;

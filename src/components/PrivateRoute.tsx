@@ -4,7 +4,7 @@ import logoLavanderia from '../assets/logo.png';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
-  allowedRoles?: ('administrador' | 'operario' | 'repartidor')[];
+  allowedRoles?: ('administrador' | 'operario' | 'repartidor' | 'cliente')[];
 }
 
 export const PrivateRoute = ({ children, allowedRoles }: PrivateRouteProps) => {
@@ -40,6 +40,8 @@ export const PrivateRoute = ({ children, allowedRoles }: PrivateRouteProps) => {
         return <Navigate to="/operario" replace />;
       case 'repartidor':
         return <Navigate to="/repartidor" replace />;
+      case 'cliente':
+        return <Navigate to="/cliente" replace />;
       default:
         return <Navigate to="/login" replace />;
     }

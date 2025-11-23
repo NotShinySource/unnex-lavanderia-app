@@ -42,6 +42,21 @@ export const EmployeePanel = () => {
       
       const comandasData: ComandaCompleta[] = [];
 
+      const comandaIds = snapshot.docs.map(doc => doc.data().comanda_id).filter(Boolean);
+      const comandasMap = new Map<string, any>();
+
+      if (comandaIds.length > 0) {
+        // Obtener todas las comandas en paralelo
+        const comandasPromises = comandaIds.map(id => getDoc(doc(db, 'comandas_2', id)));
+        const comandasDocs = await Promise.all(comandasPromises);
+        
+        comandasDocs.forEach(cmdDoc => {
+          if (cmdDoc.exists()) {
+            comandasMap.set(cmdDoc.id, cmdDoc.data());
+          }
+        });
+      }
+
       for (const docSnap of snapshot.docs) {
         const seguimientoData = docSnap.data();
         
@@ -80,13 +95,11 @@ export const EmployeePanel = () => {
 
         // Obtener comanda asociada
         try {
-          const comandaRef = doc(db, 'comandas_2', seguimiento.comanda_id);
-          const comandaDoc = await getDoc(comandaRef);
+          const comandaData = comandasMap.get(seguimiento.comanda_id);
 
-          if (comandaDoc.exists()) {
-            const comandaData = comandaDoc.data();
+          if (comandaData) {
             const comanda: Comanda = {
-              id: comandaDoc.id,
+              id: comandaData.id,
               numeroOrden: comandaData.numeroOrden,
               codigoDespacho: comandaData.codigoDespacho || generarCodigoVerificador(),
               numeroBoucher: comandaData.numeroBoucher || '',

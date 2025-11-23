@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-//import { obtenerComandaCompleta } from '../services/seguimientoService';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { ComandaCompleta, EstadoComanda, Seguimiento } from '../types';
 import { ESTADOS_CONFIG } from '../types';
 import logoLavanderia from '../assets/logo.png';
@@ -16,13 +15,17 @@ import { db } from '../config/firebase';
 export const ClientTracking = () => {
   const { codigo: codigoParam } = useParams<{ codigo?: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Detectar si viene del panel del cliente
+  const fromPanel = searchParams.get('from') === 'panel';
+  //const telefonoPanel = searchParams.get('telefono');
   
   const [codigoBusqueda, setCodigoBusqueda] = useState(codigoParam || '');
   const [comandaCompleta, setComandaCompleta] = useState<ComandaCompleta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Estados del proceso en orden
   // Estados del proceso según tipo de entrega
   const getEstadosProceso = (): EstadoComanda[] => {
     if (!comandaCompleta) {
@@ -60,119 +63,129 @@ export const ClientTracking = () => {
   }, [codigoParam]);
 
   const buscarComanda = async (codigo: string) => {
-  if (!codigo.trim()) {
-    setError('Ingresa un código de seguimiento');
-    return;
-  }
-
-  try {
-    setLoading(true);
-    setError('');
-    
-    // Buscar comanda por numeroOrden
-    const comandasRef = collection(db, 'comandas_2');
-    const q = query(comandasRef, where('numeroOrden', '==', codigo.trim()));
-    const comandaSnapshot = await getDocs(q);
-    
-    if (comandaSnapshot.empty) {
-      setError('No se encontró ningún pedido con ese código');
-      setComandaCompleta(null);
-      setLoading(false);
+    if (!codigo.trim()) {
+      setError('Ingresa un código de seguimiento');
       return;
     }
-    
-    const comandaDoc = comandaSnapshot.docs[0];
-    const comandaId = comandaDoc.id;
-    
-    // Listener en tiempo real para seguimiento
-    const seguimientoRef = doc(db, 'seguimiento_3', comandaId);
-    const unsubscribe = onSnapshot(seguimientoRef, async (seguimientoDoc) => {
-      if (!seguimientoDoc.exists()) {
-        setError('No se encontró seguimiento para este pedido');
+
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Buscar comanda por numeroOrden
+      const comandasRef = collection(db, 'comandas_2');
+      const q = query(comandasRef, where('numeroOrden', '==', codigo.trim()));
+      const comandaSnapshot = await getDocs(q);
+      
+      if (comandaSnapshot.empty) {
+        setError('No se encontró ningún pedido con ese código');
         setComandaCompleta(null);
         setLoading(false);
         return;
       }
       
-      // Obtener datos de comanda
-      const comandaDataActual = comandaDoc.data();
-      const seguimientoData = seguimientoDoc.data();
+      const comandaDoc = comandaSnapshot.docs[0];
+      const comandaId = comandaDoc.id;
       
-      // Construir ComandaCompleta con normalización
-      const { 
-        normalizarTipoCliente, 
-        normalizarTipoEntrega, 
-        generarCodigoVerificador,
-        normalizarTelefono 
-      } = await import('../utils/normalize');
-      
-      setComandaCompleta({
-        comanda: {
-          id: comandaId,
-          numeroOrden: comandaDataActual.numeroOrden,
-          codigoDespacho: comandaDataActual.codigoDespacho || generarCodigoVerificador(),
-          numeroBoucher: comandaDataActual.numeroBoucher || '',
-          nombreCliente: comandaDataActual.nombreCliente,
-          telefono: normalizarTelefono(comandaDataActual.telefono),
-          tipoCliente: normalizarTipoCliente(comandaDataActual.tipoCliente || 'Particular'),
-          direccion: comandaDataActual.direccion || undefined,
-          fechaIngreso: comandaDataActual.fechaIngreso?.toDate() || new Date(),
-          horaIngreso: comandaDataActual.horaIngreso || '',
-          fechaNotificacion: comandaDataActual.fechaNotificacion?.toDate() || undefined,
-          prendas: comandaDataActual.prendas || [],
-          montoSubtotal: comandaDataActual.montoSubtotal || 0,
-          montoTotal: comandaDataActual.montoTotal || 0,
-          tipoEntrega: normalizarTipoEntrega(comandaDataActual.tipoEntrega || 'Retiro'),
-          servicioExpress: comandaDataActual.servicioExpress || false,
-          notificado: comandaDataActual.notificado || false
-        },
-        seguimiento: {
-          id: seguimientoDoc.id,
-          ...seguimientoData,
-          historialEstados: seguimientoData.historialEstados?.map((h: any) => ({
-            ...h,
-            fechaCambio: h.fechaCambio?.toDate() || new Date()
-          })) || [],
-          desmanche: {
-            ...seguimientoData.desmanche,
-            ultimaFecha: seguimientoData.desmanche?.ultimaFecha?.toDate() || null
+      // Listener en tiempo real para seguimiento
+      const seguimientoRef = doc(db, 'seguimiento_3', comandaId);
+      const unsubscribe = onSnapshot(seguimientoRef, async (seguimientoDoc) => {
+        if (!seguimientoDoc.exists()) {
+          setError('No se encontró seguimiento para este pedido');
+          setComandaCompleta(null);
+          setLoading(false);
+          return;
+        }
+        
+        // Obtener datos de comanda
+        const comandaDataActual = comandaDoc.data();
+        const seguimientoData = seguimientoDoc.data();
+        
+        // Construir ComandaCompleta con normalización
+        const { 
+          normalizarTipoCliente, 
+          normalizarTipoEntrega, 
+          generarCodigoVerificador,
+          normalizarTelefono 
+        } = await import('../utils/normalize');
+        
+        setComandaCompleta({
+          comanda: {
+            id: comandaId,
+            numeroOrden: comandaDataActual.numeroOrden,
+            codigoDespacho: comandaDataActual.codigoDespacho || generarCodigoVerificador(),
+            numeroBoucher: comandaDataActual.numeroBoucher || '',
+            nombreCliente: comandaDataActual.nombreCliente,
+            telefono: normalizarTelefono(comandaDataActual.telefono),
+            tipoCliente: normalizarTipoCliente(comandaDataActual.tipoCliente || 'Particular'),
+            direccion: comandaDataActual.direccion || undefined,
+            fechaIngreso: comandaDataActual.fechaIngreso?.toDate() || new Date(),
+            horaIngreso: comandaDataActual.horaIngreso || '',
+            fechaNotificacion: comandaDataActual.fechaNotificacion?.toDate() || undefined,
+            prendas: comandaDataActual.prendas || [],
+            montoSubtotal: comandaDataActual.montoSubtotal || 0,
+            montoTotal: comandaDataActual.montoTotal || 0,
+            tipoEntrega: normalizarTipoEntrega(comandaDataActual.tipoEntrega || 'Retiro'),
+            servicioExpress: comandaDataActual.servicioExpress || false,
+            notificado: comandaDataActual.notificado || false
           },
-          despacho: seguimientoData.despacho ? {
-            ...seguimientoData.despacho,
-            horaSalida: seguimientoData.despacho.horaSalida?.toDate() || null,
-            horaEntrega: seguimientoData.despacho.horaEntrega?.toDate() || null,
-            incidencia: {
-              ...seguimientoData.despacho.incidencia,
-              fecha: seguimientoData.despacho.incidencia?.fecha?.toDate() || null
-            }
-          } : undefined,
-          incidencias: seguimientoData.incidencias?.map((inc: any) => ({
-            ...inc,
-            fecha: inc.fecha?.toDate() || new Date()
-          })) || [],
-          fechaCreacion: seguimientoData.fechaCreacion?.toDate() || new Date(),
-          fechaUltimaActualizacion: seguimientoData.fechaUltimaActualizacion?.toDate() || new Date()
-        } as Seguimiento
+          seguimiento: {
+            id: seguimientoDoc.id,
+            ...seguimientoData,
+            historialEstados: seguimientoData.historialEstados?.map((h: any) => ({
+              ...h,
+              fechaCambio: h.fechaCambio?.toDate() || new Date()
+            })) || [],
+            desmanche: {
+              ...seguimientoData.desmanche,
+              ultimaFecha: seguimientoData.desmanche?.ultimaFecha?.toDate() || null
+            },
+            despacho: seguimientoData.despacho ? {
+              ...seguimientoData.despacho,
+              horaSalida: seguimientoData.despacho.horaSalida?.toDate() || null,
+              horaEntrega: seguimientoData.despacho.horaEntrega?.toDate() || null,
+              incidencia: {
+                ...seguimientoData.despacho.incidencia,
+                fecha: seguimientoData.despacho.incidencia?.fecha?.toDate() || null
+              }
+            } : undefined,
+            incidencias: seguimientoData.incidencias?.map((inc: any) => ({
+              ...inc,
+              fecha: inc.fecha?.toDate() || new Date()
+            })) || [],
+            fechaCreacion: seguimientoData.fechaCreacion?.toDate() || new Date(),
+            fechaUltimaActualizacion: seguimientoData.fechaUltimaActualizacion?.toDate() || new Date()
+          } as Seguimiento
+        });
+        
+        setLoading(false);
+        navigate(`/seguimiento/${codigo.trim()}${fromPanel ? '?from=panel' : ''}`, { replace: true });
       });
       
+      // Guardar unsubscribe para limpieza
+      return unsubscribe;
+      
+    } catch (err) {
+      console.error('Error al buscar comanda:', err);
+      setError('Error al buscar el pedido. Intenta nuevamente.');
+      setComandaCompleta(null);
       setLoading(false);
-      navigate(`/seguimiento/${codigo.trim()}`, { replace: true });
-    });
-    
-    // Guardar unsubscribe para limpieza
-    return unsubscribe;
-    
-  } catch (err) {
-    console.error('Error al buscar comanda:', err);
-    setError('Error al buscar el pedido. Intenta nuevamente.');
-    setComandaCompleta(null);
-    setLoading(false);
-  }
-};
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     buscarComanda(codigoBusqueda);
+  };
+
+  const handleVolver = () => {
+    if (fromPanel && comandaCompleta) {
+      // Obtener el teléfono de la comanda actual para mantener la búsqueda
+      const telefono = comandaCompleta.comanda.telefono;
+      navigate(`/mis-pedidos?telefono=${telefono}`);
+    } else {
+      navigate('/');
+    }
   };
 
   // Determinar índice del estado actual
@@ -216,12 +229,10 @@ export const ClientTracking = () => {
   };
 
   const getLineaWidth = (): string => {
-  if (!comandaCompleta) return 'w-16';
-
+    if (!comandaCompleta) return 'w-16';
     const esDespacho = comandaCompleta.comanda.tipoEntrega === 'despacho';
     return esDespacho ? 'w-8' : 'w-14';
   };
-
 
   return (
     <div className="min-h-screen bg-spac-light">
@@ -241,9 +252,9 @@ export const ClientTracking = () => {
           </div>
           
           <button
-            onClick={() => navigate('/')}
+            onClick={handleVolver}
             className="p-2 hover:bg-gray-100 rounded-full transition"
-            title="Volver"
+            title={fromPanel ? 'Volver a mis pedidos' : 'Volver'}
           >
             <BsArrowLeft className="text-2xl" />
           </button>
@@ -253,6 +264,17 @@ export const ClientTracking = () => {
       {/* Contenido principal */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         
+        {/* Botón de volver visible (solo si viene del panel) */}
+        {fromPanel && comandaCompleta && (
+          <button
+            onClick={handleVolver}
+            className="mb-4 flex items-center gap-2 text-spac-orange hover:text-spac-orange-dark font-semibold transition"
+          >
+            <BsArrowLeft />
+            Volver a mis pedidos
+          </button>
+        )}
+
         {/* Buscador */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
           <h2 className="text-2xl font-bold text-spac-dark mb-4">
@@ -404,13 +426,12 @@ export const ClientTracking = () => {
                             md:${getLineaWidth()}
                           `}
                         />
-
                       )}
                     </div>
                   );
                 })}
                 </div>
-                <div className="h-8"></div> {/* Espaciador invisible */}
+                <div className="h-8"></div>
               </div>
             </div>
 
@@ -535,25 +556,6 @@ export const ClientTracking = () => {
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      {/*<footer className="bg-spac-dark text-white mt-12 py-8">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h4 className="font-bold mb-3">Contacto</h4>
-              <p className="text-sm opacity-80">+56 9 1234 5678</p>
-              <p className="text-sm opacity-80">ayuda@elcobrespa.cl</p>
-              <p className="text-sm opacity-80">Av. Balmaceda 1276, Calama</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm opacity-80">
-                © 2025 El Cobre S.P.A - Todos los derechos reservados
-              </p>
-            </div>
-          </div>
-        </div>
-      </footer>*/}
     </div>
   );
 };
