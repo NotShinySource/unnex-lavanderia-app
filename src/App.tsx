@@ -8,6 +8,7 @@ import { ClientTracking } from './pages/ClientTracking';
 import { ClientPanel } from './pages/ClientPanel';
 import { FirebaseTest } from './pages/FirebaseTest';
 import { useEffect, useState } from 'react';
+import { AdminPanel } from './pages/AdminPanel';
 import { inicializarListenerComandas } from './services/seguimientoService';
 
 // URL de tu Intranet
@@ -160,15 +161,6 @@ const DashboardRedirect = () => {
   }
 };
 
-const ComingSoon = ({ title }: { title: string }) => (
-  <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-    <div className="bg-white p-8 rounded-lg shadow-md text-center">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">{title}</h1>
-      <p className="text-gray-600">Esta página estará disponible pronto</p>
-    </div>
-  </div>
-);
-
 function App() {
 
   useEffect(() => {
@@ -192,7 +184,7 @@ function App() {
         
         <Route path="/admin" element={
             <PrivateRoute allowedRoles={['administrador']}>
-              <ComingSoon title="Panel de Administrador" />
+              <AdminPanel />  // ✅ AGREGAR ESTO
             </PrivateRoute>
           } 
         />

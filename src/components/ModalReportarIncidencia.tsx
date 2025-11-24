@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { ComandaCompleta, TipoIncidencia } from '../types';
-import { PLANTILLAS_INCIDENCIAS_OPERARIO } from '../types';
 import { reportarIncidencia } from '../services/seguimientoService';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,6 +8,38 @@ interface ModalReportarIncidenciaProps {
   onClose: () => void;
   onSuccess: () => void;
 }
+
+// Catálogos de equipos e insumos
+const EQUIPOS = [
+  'Lavadora Industrial',
+  'Secadora Industrial',
+  'Plancha de Rodillo',
+  'Plancha de Vapor',
+  'Centro de Planchado',
+  'Caldera',
+  'Otro equipo'
+];
+
+const INSUMOS = [
+  'Detergente Industrial',
+  'Cloro / Blanqueador',
+  'Suavizante',
+  'Quitamanchas',
+  'Desinfectante',
+  'Bolsas de Empaquetado',
+  'Etiquetas',
+  'Otro insumo'
+];
+
+const TIPOS_DAÑO_PRENDA = [
+  'Mancha persistente',
+  'Desgarro / Rotura',
+  'Decoloración',
+  'Encogimiento',
+  'Quemadura por plancha',
+  'Pérdida de botones',
+  'Otro daño'
+];
 
 export const ModalReportarIncidencia = ({ 
   comandaCompleta, 
@@ -19,35 +50,68 @@ export const ModalReportarIncidencia = ({
   const { comanda, seguimiento } = comandaCompleta;
   
   const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoIncidencia | null>(null);
-  const [descripcionPersonalizada, setDescripcionPersonalizada] = useState('');
+  
+  // Selectores específicos
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState('');
+  const [insumoSeleccionado, setInsumoSeleccionado] = useState('');
+  const [tipoDañoSeleccionado, setTipoDañoSeleccionado] = useState('');
+  
+  const [descripcionAdicional, setDescripcionAdicional] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleReportar = async () => {
     if (!userData || !tipoSeleccionado) return;
 
-    // Validar descripción si es tipo "otro"
-    if (tipoSeleccionado === 'otro' && !descripcionPersonalizada.trim()) {
-      setError('Debes describir la incidencia');
-      return;
+    // Construir descripción según tipo
+    let descripcionFinal = '';
+
+    switch (tipoSeleccionado) {
+      case 'falla_equipo':
+        if (!equipoSeleccionado) {
+          setError('Selecciona el equipo con falla');
+          return;
+        }
+        descripcionFinal = `Falla en: ${equipoSeleccionado}`;
+        if (descripcionAdicional.trim()) {
+          descripcionFinal += ` - ${descripcionAdicional.trim()}`;
+        }
+        break;
+
+      case 'falta_insumo':
+        if (!insumoSeleccionado) {
+          setError('Selecciona el insumo faltante');
+          return;
+        }
+        descripcionFinal = `Falta de: ${insumoSeleccionado}`;
+        if (descripcionAdicional.trim()) {
+          descripcionFinal += ` - ${descripcionAdicional.trim()}`;
+        }
+        break;
+
+      case 'prenda_danada':
+        if (!tipoDañoSeleccionado) {
+          setError('Selecciona el tipo de daño');
+          return;
+        }
+        descripcionFinal = `Prenda dañada - ${tipoDañoSeleccionado}`;
+        if (descripcionAdicional.trim()) {
+          descripcionFinal += ` - ${descripcionAdicional.trim()}`;
+        }
+        break;
+
+      case 'otro':
+        if (!descripcionAdicional.trim()) {
+          setError('Describe la incidencia');
+          return;
+        }
+        descripcionFinal = descripcionAdicional.trim();
+        break;
     }
 
     try {
       setLoading(true);
       setError('');
-
-      // Obtener descripción final
-      let descripcionFinal = descripcionPersonalizada.trim();
-      
-      if (tipoSeleccionado !== 'otro') {
-        const plantilla = PLANTILLAS_INCIDENCIAS_OPERARIO.find(p => p.tipo === tipoSeleccionado);
-        descripcionFinal = plantilla?.descripcion || '';
-        
-        // Si hay descripción personalizada adicional, agregarla
-        if (descripcionPersonalizada.trim()) {
-          descripcionFinal += ` - ${descripcionPersonalizada.trim()}`;
-        }
-      }
 
       await reportarIncidencia(
         seguimiento,
@@ -65,6 +129,19 @@ export const ModalReportarIncidencia = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetSelecciones = () => {
+    setEquipoSeleccionado('');
+    setInsumoSeleccionado('');
+    setTipoDañoSeleccionado('');
+    setDescripcionAdicional('');
+    setError('');
+  };
+
+  const handleTipoChange = (tipo: TipoIncidencia) => {
+    setTipoSeleccionado(tipo);
+    resetSelecciones();
   };
 
   return (
@@ -104,58 +181,172 @@ export const ModalReportarIncidencia = ({
               Tipo de Incidencia
             </label>
             <div className="space-y-2">
-              {PLANTILLAS_INCIDENCIAS_OPERARIO.map(plantilla => (
-                <label
-                  key={plantilla.tipo}
-                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
-                    tipoSeleccionado === plantilla.tipo
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="tipoIncidencia"
-                    value={plantilla.tipo}
-                    checked={tipoSeleccionado === plantilla.tipo}
-                    onChange={() => setTipoSeleccionado(plantilla.tipo)}
-                    className="w-5 h-5 text-red-600 mt-0.5"
-                    disabled={loading}
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-spac-dark">{plantilla.titulo}</p>
-                    {plantilla.descripcion && plantilla.tipo !== 'otro' && (
-                      <p className="text-xs text-spac-gray mt-1">{plantilla.descripcion}</p>
-                    )}
-                  </div>
-                </label>
-              ))}
+              <label
+                className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
+                  tipoSeleccionado === 'falla_equipo'
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="tipoIncidencia"
+                  value="falla_equipo"
+                  checked={tipoSeleccionado === 'falla_equipo'}
+                  onChange={() => handleTipoChange('falla_equipo')}
+                  className="w-5 h-5 text-red-600 mt-0.5"
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-spac-dark">⚙️ Falla en Equipo</p>
+                  <p className="text-xs text-spac-gray mt-1">Equipo no funciona correctamente</p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
+                  tipoSeleccionado === 'falta_insumo'
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="tipoIncidencia"
+                  value="falta_insumo"
+                  checked={tipoSeleccionado === 'falta_insumo'}
+                  onChange={() => handleTipoChange('falta_insumo')}
+                  className="w-5 h-5 text-red-600 mt-0.5"
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-spac-dark">📦 Falta de Insumo</p>
+                  <p className="text-xs text-spac-gray mt-1">No hay suficiente insumo para continuar</p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
+                  tipoSeleccionado === 'prenda_danada'
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="tipoIncidencia"
+                  value="prenda_danada"
+                  checked={tipoSeleccionado === 'prenda_danada'}
+                  onChange={() => handleTipoChange('prenda_danada')}
+                  className="w-5 h-5 text-red-600 mt-0.5"
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-spac-dark">👕 Prenda Dañada</p>
+                  <p className="text-xs text-spac-gray mt-1">La prenda presenta algún daño</p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
+                  tipoSeleccionado === 'otro'
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="tipoIncidencia"
+                  value="otro"
+                  checked={tipoSeleccionado === 'otro'}
+                  onChange={() => handleTipoChange('otro')}
+                  className="w-5 h-5 text-red-600 mt-0.5"
+                  disabled={loading}
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-spac-dark">⚠️ Otro</p>
+                  <p className="text-xs text-spac-gray mt-1">Otra incidencia no listada</p>
+                </div>
+              </label>
             </div>
           </div>
 
-          {/* Campo de descripción adicional/personalizada */}
+          {/* Selector específico según tipo */}
+          {tipoSeleccionado === 'falla_equipo' && (
+            <div>
+              <label className="block text-sm font-semibold text-spac-dark mb-2">
+                ¿Qué equipo presenta la falla? *
+              </label>
+              <select
+                value={equipoSeleccionado}
+                onChange={(e) => setEquipoSeleccionado(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                disabled={loading}
+              >
+                <option value="">Selecciona el equipo...</option>
+                {EQUIPOS.map(equipo => (
+                  <option key={equipo} value={equipo}>{equipo}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {tipoSeleccionado === 'falta_insumo' && (
+            <div>
+              <label className="block text-sm font-semibold text-spac-dark mb-2">
+                ¿Qué insumo falta? *
+              </label>
+              <select
+                value={insumoSeleccionado}
+                onChange={(e) => setInsumoSeleccionado(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                disabled={loading}
+              >
+                <option value="">Selecciona el insumo...</option>
+                {INSUMOS.map(insumo => (
+                  <option key={insumo} value={insumo}>{insumo}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {tipoSeleccionado === 'prenda_danada' && (
+            <div>
+              <label className="block text-sm font-semibold text-spac-dark mb-2">
+                ¿Qué tipo de daño presenta? *
+              </label>
+              <select
+                value={tipoDañoSeleccionado}
+                onChange={(e) => setTipoDañoSeleccionado(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                disabled={loading}
+              >
+                <option value="">Selecciona el tipo de daño...</option>
+                {TIPOS_DAÑO_PRENDA.map(tipo => (
+                  <option key={tipo} value={tipo}>{tipo}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Descripción adicional */}
           {tipoSeleccionado && (
             <div>
               <label className="block text-sm font-semibold text-spac-dark mb-2">
                 {tipoSeleccionado === 'otro' ? 'Describe la Incidencia *' : 'Detalles Adicionales (Opcional)'}
               </label>
               <textarea
-                value={descripcionPersonalizada}
-                onChange={(e) => setDescripcionPersonalizada(e.target.value)}
+                value={descripcionAdicional}
+                onChange={(e) => setDescripcionAdicional(e.target.value)}
                 placeholder={
                   tipoSeleccionado === 'otro'
                     ? 'Describe el problema en detalle...'
                     : 'Agrega información adicional si es necesario...'
                 }
-                rows={4}
+                rows={3}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
                 disabled={loading}
               />
-              {tipoSeleccionado !== 'otro' && (
-                <p className="text-xs text-spac-gray mt-1">
-                  💡 Reemplaza [ESPECIFICAR] con la información específica
-                </p>
-              )}
             </div>
           )}
 
@@ -179,7 +370,7 @@ export const ModalReportarIncidencia = ({
           </button>
           <button
             onClick={handleReportar}
-            disabled={loading || !tipoSeleccionado || (tipoSeleccionado === 'otro' && !descripcionPersonalizada.trim())}
+            disabled={loading || !tipoSeleccionado}
             className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Reportando...' : 'Reportar Incidencia'}
