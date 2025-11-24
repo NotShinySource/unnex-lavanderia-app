@@ -11,7 +11,6 @@ import {
 } from 'react-icons/bs';
 import { onSnapshot, doc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-
 export const ClientTracking = () => {
   const { codigo: codigoParam } = useParams<{ codigo?: string }>();
   const navigate = useNavigate();

@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import logoLavanderia from '../assets/logo.png';
+import Loader from './Loader';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -9,20 +9,9 @@ interface PrivateRouteProps {
 
 export const PrivateRoute = ({ children, allowedRoles }: PrivateRouteProps) => {
   const { currentUser, userData, loading } = useAuth();
-  // Mostrar loading mientras se obtienen los datos
+  
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-spac-light">
-        <div className="text-center">
-          <img 
-            src={logoLavanderia} 
-            alt="Logo Lavandería El Cobre" 
-            className="inline-flex items-center justify-center w-20 h-20 bg-spac-light rounded-full mb-4"
-          />
-          <p className="text-spac-gray">Verificando permisos...</p>
-        </div>
-      </div>
-    );
+    return <Loader fullScreen text="Verificando permisos..." />;
   }
 
   // Si no hay usuario autenticado, redirigir a login
@@ -32,7 +21,6 @@ export const PrivateRoute = ({ children, allowedRoles }: PrivateRouteProps) => {
 
   // Si hay roles permitidos, verificar que el usuario tenga uno de ellos
   if (allowedRoles && !allowedRoles.includes(userData.rol)) {
-    // Redirigir al dashboard correcto según su rol
     switch (userData.rol) {
       case 'administrador':
         return <Navigate to="/admin" replace />;

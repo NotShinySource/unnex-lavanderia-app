@@ -3,16 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { collection, query, where, onSnapshot, /*doc, getDoc*/ } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { LogoutButton } from '../components/LogoutButton';
 import type { Comanda, Seguimiento, ComandaCompleta } from '../types';
 import { ESTADOS_CONFIG } from '../types';
+import Loader from '../components/Loader';
 import { 
   normalizarTipoCliente, 
   normalizarTipoEntrega, 
   generarCodigoVerificador,
   normalizarTelefono 
 } from '../utils/normalize';
-import logoLavanderia from '../assets/logo.png';
 import { BsEye } from 'react-icons/bs';
 
 export const ClientPanel = () => {
@@ -35,7 +34,7 @@ export const ClientPanel = () => {
     // Normalizar el teléfono del usuario
     const telefonoNormalizado = normalizarTelefono(userData.telefono);
 
-    // ⭐ CAMBIO 1: Variable para almacenar el unsubscribe de seguimientos
+    // CAMBIO 1: Variable para almacenar el unsubscribe de seguimientos
     let unsubscribeSeguimientos: (() => void) | null = null;
 
     // Buscar comandas con ese teléfono
@@ -279,16 +278,7 @@ export const ClientPanel = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-spac-light flex items-center justify-center">
-        <div className="text-center">
-          <img 
-            src={logoLavanderia} 
-            alt="Logo Lavandería El Cobre" 
-            className="inline-flex items-center justify-center w-20 h-20 bg-spac-light rounded-full mb-4 overflow-hidden"
-          />
-          <p className="text-spac-gray">Cargando tus pedidos...</p>
-        </div>
-      </div>
+      <Loader fullScreen text="Cargando tus pedidos..." />
     );
   }
 
@@ -301,7 +291,6 @@ export const ClientPanel = () => {
             <h1 className="text-xl font-bold text-spac-dark">Mis Pedidos</h1>
             <p className="text-sm text-spac-gray">{userData?.nombre}</p>
           </div>
-          <LogoutButton />
         </div>
       </nav>
 

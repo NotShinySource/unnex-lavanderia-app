@@ -20,12 +20,13 @@ interface UserData {
   fecha_creacion?: Date;
   ultimo_acceso?: Date;
   activo?: boolean;
+  esToken?: boolean; // Flag para saber si es login por token
 }
 
 interface AuthContextType {
   currentUser: User | null;
   userData: UserData | null;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loginWithToken: (uid: string) => Promise<boolean>;
   loading: boolean;
@@ -33,7 +34,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Clave para sessionStorage (se borra al cerrar navegador)
+// Clave para sessionStorage
 const SESSION_KEY = 'lavanderia_session_temp';
 
 export const useAuth = () => {
@@ -45,8 +46,7 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  // 1. CAMBIO: Usamos sessionStorage en lugar de localStorage
-  // Esto evita que el usuario se quede guardado "para siempre" si no hay "Remember me"
+  // Inicializar estado leyendo sessionStorage
   const [userData, setUserData] = useState<UserData | null>(() => {
     try {
       const stored = sessionStorage.getItem(SESSION_KEY);
@@ -56,12 +56,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   });
   
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Simulamos un currentUser si tenemos userData guardado
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (userData) {
+      return { email: userData.correo, uid: userData.uid } as User;
+    }
+    return null;
+  });
+
   const [loading, setLoading] = useState(!userData);
 
-  // Función auxiliar para guardar sesión temporal
   const saveSession = (data: UserData) => {
     setUserData(data);
+    // Simulamos objeto User de firebase para compatibilidad
+    setCurrentUser({ email: data.correo, uid: data.uid } as User);
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
   };
 
@@ -71,14 +79,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.removeItem(SESSION_KEY);
   };
 
-  // LOGIN CON TOKEN (INTRA)
+  // LOGIN CON TOKEN (INTRANET)
   const loginWithToken = async (uid: string): Promise<boolean> => {
     try {
       setLoading(true);
       
-      // 2. IMPORTANTE: Forzar logout de Firebase para evitar conflictos de permisos
-      // si veníamos de otra sesión.
+      // 1. Limpieza total antes de procesar nuevo token
       await signOut(auth); 
+      clearSession();
       
       const userDoc = await getDoc(doc(db, 'usuarios', uid));
       
@@ -94,19 +102,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           telefono: docData.telefono || undefined,
           fecha_creacion: docData.fecha_creacion?.toDate?.(),
           ultimo_acceso: docData.ultimo_acceso?.toDate?.(),
-          activo: docData.activo !== undefined ? docData.activo : true
+          activo: docData.activo !== undefined ? docData.activo : true,
+          esToken: true
         };
 
-        // Simulamos el usuario de Auth para que el resto de la app no falle
-        const fakeUser = {
-          uid: uid,
-          email: data.correo,
-          displayName: data.nombre,
-          emailVerified: true,
-        } as unknown as User;
-
-        setCurrentUser(fakeUser);
-        saveSession(data); // Guardamos en session
+        saveSession(data);
         return true;
       } else {
         console.error('Usuario no encontrado en Firestore');
@@ -120,10 +120,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // LOGIN NORMAL (EMAIL/PASS)
   const login = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // El onAuthStateChanged se encargará de cargar los datos
     } catch (error: any) {
       console.error(error);
       throw error;
@@ -139,11 +139,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // LISTENER DE FIREBASE AUTH
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Si detectamos usuario de Firebase (Login normal)
       if (user) {
-        setCurrentUser(user);
-        // Si ya tenemos datos cargados por token (y coinciden), no recargamos
+        // Evitamos recargar si ya tenemos los datos correctos
         if (userData && userData.uid === user.uid) {
           setLoading(false);
           return;
@@ -160,7 +161,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               nombre: docData.nombre || user.displayName || 'Usuario',
               rol: docData.rol || 'operario',
               telefono: docData.telefono || undefined,
-              activo: docData.activo ?? true
+              activo: docData.activo ?? true,
+              esToken: false
             };
             saveSession(newData);
           }
@@ -168,19 +170,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.error("Error cargando datos de usuario", error);
         }
       } else {
-        // Si no hay usuario de Firebase Y no estamos en medio de un proceso manual
-        if (!loading) {
-          // No borramos inmediatamente si userData existe para evitar parpadeos 
-          // en recargas manuales, pero si auth es null real, limpiamos.
-          // Para este caso simple, sincronizamos:
-          // setCurrentUser(null);
+        // Si Firebase dice "no hay usuario", SOLO limpiamos si NO estamos en modo Token
+        // Esto evita que firebase sobrescriba la sesión manual de la intranet
+        if (userData && !userData.esToken) {
+          clearSession();
         }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, []); // Array vacío intencional
 
   const value: AuthContextType = {
     currentUser,

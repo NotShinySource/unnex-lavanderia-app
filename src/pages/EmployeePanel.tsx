@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { LogoutButton } from '../components/LogoutButton';
 import { ModalAvanzarEstado } from '../components/ModalAvanzarEstado';
 import { ModalReportarIncidencia } from '../components/ModalReportarIncidencia';
 import { activarDesmanche, retrocederEstado } from '../services/seguimientoService';
@@ -14,7 +13,7 @@ import {
   generarCodigoVerificador,
   normalizarTelefono 
 } from '../utils/normalize';
-import logoLavanderia from '../assets/logo.png';
+import Loader from '../components/Loader';
 import {
   MdWarningAmber,
   MdKeyboardReturn
@@ -340,16 +339,7 @@ export const EmployeePanel = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-spac-light flex items-center justify-center">
-        <div className="text-center">
-          <img 
-            src={logoLavanderia} 
-            alt="Logo Lavandería El Cobre" 
-            className="inline-flex items-center justify-center w-20 h-20 bg-spac-light rounded-full mb-4 overflow-hidden"
-          />
-          <p className="text-spac-gray">Cargando pedidos...</p>
-        </div>
-      </div>
+      <Loader fullScreen text="Cargando panel..." />
     );
   }
 
@@ -366,7 +356,6 @@ export const EmployeePanel = () => {
               Bienvenido, {userData?.nombre}
             </p>
           </div>
-          <LogoutButton />
         </div>
       </nav>
 

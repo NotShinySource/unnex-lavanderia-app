@@ -2,16 +2,15 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { LogoutButton } from '../components/LogoutButton';
 import type { Seguimiento, EstadoComanda, Comanda, ComandaCompleta, Incidencia } from '../types';
 import { ESTADOS_CONFIG } from '../types';
+import Loader from '../components/Loader';
 import { 
   normalizarTipoCliente, 
   normalizarTipoEntrega, 
   generarCodigoVerificador,
   normalizarTelefono 
 } from '../utils/normalize';
-import logoLavanderia from '../assets/logo.png';
 import {
   MdWarningAmber,
   MdCheckCircle,
@@ -393,16 +392,7 @@ export const AdminPanel = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-spac-light flex items-center justify-center">
-        <div className="text-center">
-          <img 
-            src={logoLavanderia} 
-            alt="Logo" 
-            className="inline-flex w-20 h-20 mb-4"
-          />
-          <p className="text-spac-gray">Cargando panel...</p>
-        </div>
-      </div>
+      <Loader fullScreen text="Cargando panel..." />
     );
   }
 
@@ -415,7 +405,6 @@ export const AdminPanel = () => {
             <h1 className="text-2xl font-bold text-spac-dark">Panel de Administración</h1>
             <p className="text-sm text-spac-gray">Bienvenido, {userData?.nombre}</p>
           </div>
-          <LogoutButton />
         </div>
       </nav>
 
